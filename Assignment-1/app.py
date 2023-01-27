@@ -7,6 +7,12 @@ api = Api(app)
 
 # This is a basic app.py, doesn't have logic implemented in it
 
+
+# Dictionary: indexed by topic name
+# Each entry is a list of tuples (a,b) 
+# where a = topic-specific consumer id
+# and b = next read index for the consumer 
+
 topics = [
     "hello",
     "bye"
@@ -27,37 +33,64 @@ logs = {
     "bye": ["msg1"]
 }
 
+
 class Topics(Resource):
     parser = reqparse.RequestParser()
     parser.add_argument('name', required = True, help = '"Name" field should be provided in the body')
 
     def get(self):
-        return topics
-    
-    def post(self):
-        args = Topics.parser.parse_args()
-        topics.append(args["name"])
         return {
             "status": "Success",
-            "message": "Topic '" + args["name"] + "' created."
+            "topics": topics
         }
+
+    def post(self):
+        args = Topics.parser.parse_args()
+        if(args["name"] not in topics): 
+            topics.append(args["name"])
+            return {
+                "status": "Success",
+                "message": "Topic \'" + request.get_json()["name"] + "\' created."
+            }
+        else: 
+            return {
+                "status": "Failure",
+                "message": "Topic \'" + request.get_json()["name"] + "\' already exists."
+            }
 
 class ConsumerRegister(Resource):
     parser = reqparse.RequestParser()
-    parser.add_argument('topic', required = True, help = '"topic" field should be provided in the body')
+    parser.add_argument('topic', required = True, help = '\"topic\" field should be provided in the body')
 
     def post(self):
         args = ConsumerRegister.parser.parse_args()
+
+        ## DEBUG ##
         print(args["topic"])
+        ###########
+
         if args["topic"] not in topics:
             return {
                 "status": "Failure",
                 "message": "Topic '" + request.get_json()["topic"] + "' doesn't exist."
             }
-        return {
-            "status": "Success",
-            "message": "Topic '" + request.get_json()["topic"] + "' created."
-        }
+        else:
+            next_consumer_id = 0
+
+            if(args["topic"] not in consumers.keys()):
+                consumers[args["topic"]] = []
+                consumers[args["topic"]].append([next_consumer_id,0])
+            else: 
+                for _consumer in consumers[args["topic"]]:
+                    next_consumer_id = max(next_consumer_id, _consumer[0])
+                next_consumer_id += 1
+                consumers[args["topic"]].append([next_consumer_id,0])
+    
+            return {
+                "status": "Success",
+                "consumer_id": next_consumer_id,
+                "message": "Subscribed to topic '" + request.get_json()["topic"] + "'."
+            }
 
 class ProducerRegister(Resource):
     parser = reqparse.RequestParser()
@@ -65,15 +98,32 @@ class ProducerRegister(Resource):
 
     def post(self):
         args = ProducerRegister.parser.parse_args()
+
+        ## DEBUG ##
         print(args["topic"])
+        ###########
+
+        next_producer_id = 0
         if args["topic"] not in topics:
-            return {
-                "status": "Failure",
-                "message": "Topic '" + request.get_json()["topic"] + "' doesn't exist."
-            }
+            # if topic doesnt exist, add the topic
+            topics.append(args["topic"])
+            # since topic is newly added, create a new topic entry in the producers dict
+            producers[args["topic"]] = [next_producer_id]
+        else:
+            # topic exist but no one has registered to it as producer
+            if(args["topic"] not in producers.keys()):
+                producers[args["topic"]] = [next_producer_id]
+            # already existing entries for producers of the topic
+            else:
+                for _producer in producers[args["topic"]]:
+                    next_producer_id = max(_producer, next_producer_id)
+                next_producer_id += 1
+                producers[args["topic"]].append(next_producer_id)
+
         return {
             "status": "Success",
-            "message": "Topic '" + request.get_json()["topic"] + "' created."
+            "producer_id": next_producer_id,
+            "message": "Subscribed to topic '" + request.get_json()["topic"] + "'."
         }
 
 class Enqueue(Resource):
