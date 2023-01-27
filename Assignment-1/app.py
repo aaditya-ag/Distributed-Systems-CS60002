@@ -85,7 +85,11 @@ class ConsumerRegister(Resource):
                     next_consumer_id = max(next_consumer_id, _consumer[0])
                 next_consumer_id += 1
                 consumers[args["topic"]].append([next_consumer_id,0])
-    
+
+            ## DEBUG ##
+            print(consumers)
+            ###########
+
             return {
                 "status": "Success",
                 "consumer_id": next_consumer_id,
@@ -119,6 +123,10 @@ class ProducerRegister(Resource):
                     next_producer_id = max(_producer, next_producer_id)
                 next_producer_id += 1
                 producers[args["topic"]].append(next_producer_id)
+
+        ## DEBUG ##
+        print(producers)
+        ###########
 
         return {
             "status": "Success",
