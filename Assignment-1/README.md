@@ -32,7 +32,7 @@ sudo apt-get -y install postgresql
 
 - Now create a database by logging into your postgres client using the following commands
 ```
-sudo -u -i postgres
+sudo -i -u postgres
 ```
 
 - Now you will be interacting as postgres@server. Now enter psql in the CLI
