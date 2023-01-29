@@ -1,9 +1,14 @@
 from flask import Flask, jsonify, request
 from flask_restful import Resource, Api, reqparse
+from flask_sqlalchemy import SQLAlchemy
+from flask_migrate import Migrate
 
 app = Flask(__name__)
-api = Api(app)
+app.config['SQLALCHEMY_DATABASE_URI'] = "postgresql://postgres:admin@localhost:5432/distributed_queue"
+db = SQLAlchemy(app)
+migrate = Migrate(app, db)
 
+api = Api(app)
 
 # This is a basic app.py, doesn't have logic implemented in it
 
@@ -33,12 +38,15 @@ logs = {
     "bye": ["msg1"]
 }
 
+from models import TopicsModel
 
 class Topics(Resource):
     parser = reqparse.RequestParser()
     parser.add_argument('name', required = True, help = '"Name" field should be provided in the body')
 
     def get(self):
+        topics = TopicsModel.query.all()
+        topics = [topic.as_dict() for topic in topics]
         return {
             "status": "Success",
             "topics": topics
@@ -46,17 +54,32 @@ class Topics(Resource):
 
     def post(self):
         args = Topics.parser.parse_args()
-        if(args["name"] not in topics): 
-            topics.append(args["name"])
-            return {
-                "status": "Success",
-                "message": "Topic \'" + request.get_json()["name"] + "\' created."
-            }
-        else: 
+
+        if TopicsModel.query.filter_by(name=args["name"]).first() is not None:
             return {
                 "status": "Failure",
                 "message": "Topic \'" + request.get_json()["name"] + "\' already exists."
             }
+        else:
+            topic = TopicsModel(name = args["name"])
+            db.session.add(topic)
+            db.session.commit()
+            return {
+                "status": "Success",
+                "message": "Topic \'" + topic.name + "\' created."
+            }
+
+        # if(args["name"] not in topics): 
+        #     topics.append(args["name"])
+        #     return {
+        #         "status": "Success",
+        #         "message": "Topic \'" + request.get_json()["name"] + "\' created."
+        #     }
+        # else: 
+        #     return {
+        #         "status": "Failure",
+        #         "message": "Topic \'" + request.get_json()["name"] + "\' already exists."
+        #     }
 
 class ConsumerRegister(Resource):
     parser = reqparse.RequestParser()
