@@ -64,5 +64,5 @@ flask db upgrade
 
 - Run the app
 ```
-flask --app app --debug run
+flask run
 ```
