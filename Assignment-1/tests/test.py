@@ -1,29 +1,30 @@
-import requests
+from myqueue import MyProducer, MyConsumer
 
-base_url = 'http://127.0.0.1:5000/'
+def produce():
+    producer = MyProducer(
+    topics=['topic1', 'topic2'],
+    broker='http://localhost:5000')
+    try:
+        # Produce message and wait for it to be sent
+        producer.send("topic1", "DEBUG: This is a log message!")
+    except Exception as e:
+        # Wait for all messages to be delivered or expire
+        print(f"Error Occurred => {e}")
 
-def test_get_topics():
-    print(50*"-")
-    print(":: Testing Get Topics ::")
-    print(50*"-")
-    resp = requests.get(base_url+"topics")
-    # assert(resp.status_code == 200)
-    data = resp.json()
-    # assert(data == ['hello', 'bye'])
-    print(data)
-    print(50*"-")
-
-def test_create_topic():
-    print(50*"-")
-    print(":: Testing Create Topic ::")
-    print(50*"-")
-    data = {
-        "name": "test_topic_1"
-    }
-    resp = requests.post(url=base_url+"topics",json=data)
-    print(resp.status_code)
-    print(50*"-")
+# Consumer client:
+def consume():
+    consumer = MyConsumer(
+    topics=[ 'topic1', 'topic2'],
+    broker='http://localhost:5000')
+    try:
+        # Consume messages
+        while consumer.has_next('topic1'):
+        # get_next() can be implemented as a generator
+            print("consumed: ", consumer.get_next('topic1'))
+    except Exception as e:
+        # Wait for all messages to be delivered or expire
+        print(f"Error Occurred => {e}")
 
 if __name__ == '__main__':
-    test_create_topic()
-    test_get_topics()
+    produce()
+    consume()
