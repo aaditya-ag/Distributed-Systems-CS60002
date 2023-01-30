@@ -10,6 +10,13 @@ migrate = Migrate(app, db)
 
 api = Api(app)
 
+from models import (
+    TopicsModel, 
+    ProducerModel, 
+    ConsumerModel,
+    LogsModel
+)
+
 # This is a basic app.py, doesn't have logic implemented in it
 
 
@@ -37,8 +44,6 @@ logs = {
     "hello": ["msg1", "msg2"],
     "bye": ["msg1"]
 }
-
-from models import TopicsModel, ProducerModel, ConsumerModel
 
 class Topics(Resource):
     parser = reqparse.RequestParser()
@@ -92,14 +97,16 @@ class ConsumerRegister(Resource):
         print(args["topic"])
         ###########
 
+        topic = TopicsModel.query.filter_by(name=args["topic"]).first()
+
         # If topic doesn't exist then return error.
-        if TopicsModel.query.filter_by(name=args["topic"]).first() is None:
+        if topic is None:
             return {
                 "status": "Failure",
                 "message": "Topic '" + args["topic"] + "' doesn't exist."
             }
         
-        topic_id = TopicsModel.query.filter_by(name=args["topic"]).first().id
+        topic_id = topic.id
         consumer = ConsumerModel(topic_id=topic_id)
         db.session.add(consumer)
         db.session.flush()
@@ -108,7 +115,7 @@ class ConsumerRegister(Resource):
         return {
             "status": "Success",
             "consumer_id": consumer.consumer_id,
-            "message": "Subscribed to topic '" + request.get_json()["topic"] + "'."
+            "message": "Subscribed to topic '" + topic.name + "'."
         }
 
         # if args["topic"] not in topics:
@@ -144,18 +151,21 @@ class ProducerRegister(Resource):
     
     def post(self):
         args = ProducerRegister.parser.parse_args()
-
+        
         ## DEBUG ##
         print(args["topic"])
         ###########
 
+        topic = TopicsModel.query.filter_by(name=args["topic"]).first()
+
         # If topic doesn't exist then create one.
-        if TopicsModel.query.filter_by(name=args["topic"]).first() is None:
+        if topic is None:
             topic = TopicsModel(name = args["topic"])
             db.session.add(topic)
+            db.session.flush()
             db.session.commit()
         
-        topic_id = TopicsModel.query.filter_by(name=args["topic"]).first().id
+        topic_id = topic.id
         producer = ProducerModel(topic_id=topic_id)
         db.session.add(producer)
         db.session.flush()
@@ -205,21 +215,59 @@ class Enqueue(Resource):
     def post(self):
         args = Enqueue.parser.parse_args()
         
-        if args["topic"] not in topics:
+        topic = TopicsModel.query.filter_by(name=args["topic"]).first()
+        
+        # If topic doesn't exist then return error.
+        if topic is None:
             return {
                 "status": "Failure",
-                "message": "Topic '" + request.get_json()["topic"] + "' doesn't exist."
+                "message": f"Topic {args['topic']} doesn't exist."
             }
-        if int(args["producer_id"]) not in producers[args["topic"]]:
+
+        producer = ProducerModel.query.filter_by(producer_id = args["producer_id"]).first()
+       
+        # If producer does not exist then return error
+        if producer is None:
             return {
                 "status": "Failure",
-                "message": "Producer ID '" + request.get_json()["producer_id"] + "' is not registered for the given topic."
+                "message": f"Producer with id = {args['producer_id']} doesn't exist."
             }
-        logs[args["topic"]].append(args["message"])
+
+        # if producer's topic doesn't match with the topic sent in argument, then return error  
+        if producer.topic_id != topic.id:
+             return {
+                "status": "Failure",
+                "message": f"Producer with id = {args['producer_id']} doesn't have access to the topic {topic.name}"
+            }
+
+        # Get the next message index from the database in this queue
+        msg_index = LogsModel.query.filter_by(topic_id = topic.id).count()
+        
+        # Create the log message
+        log_message = LogsModel(topic_id=topic.id, message=args["message"], message_index=msg_index)
+        db.session.add(log_message)
+        db.session.commit()
+
         return {
             "status": "Success",
-            "message": "Message '" + request.get_json()["message"] + "' added for the topic."
+            "message": f"Message `{log_message.message}` added for the topic."
         }
+
+        # if args["topic"] not in topics:
+        #     return {
+        #         "status": "Failure",
+        #         "message": "Topic '" + request.get_json()["topic"] + "' doesn't exist."
+        #     }
+        # if int(args["producer_id"]) not in producers[args["topic"]]:
+        #     return {
+        #         "status": "Failure",
+        #         "message": "Producer ID '" + request.get_json()["producer_id"] + "' is not registered for the given topic."
+        #     }
+        # logs[args["topic"]].append(args["message"])
+        # return {
+        #     "status": "Success",
+        #     "message": "Message '" + request.get_json()["message"] + "' added for the topic."
+        # }
 
 class Dequeue(Resource):
     parser = reqparse.RequestParser()
@@ -228,29 +276,71 @@ class Dequeue(Resource):
 
     def get(self):
         args = Dequeue.parser.parse_args()
+
+        topic = TopicsModel.query.filter_by(name=args["topic"]).first()
         
-        if args["topic"] not in topics:
+        # If topic doesn't exist then return error.
+        if topic is None:
             return {
                 "status": "Failure",
-                "message": "Topic '" + request.get_json()["topic"] + "' doesn't exist."
+                "message": f"Topic {args['topic']} doesn't exist."
             }
-        cons_id = [i[0] for i in consumers[args["topic"]]]
-        if int(args["consumer_id"]) not in cons_id:
+
+        consumer = ConsumerModel.query.filter_by(consumer_id = args["consumer_id"]).first()
+
+        # If Consumer does not exist then return error
+        if consumer is None:
             return {
                 "status": "Failure",
-                "message": "Consumer ID '" + request.get_json()["consumer_id"] + "' is not registered for the given topic."
+                "message": f"Consumer with id = {args['consumer_id']} doesn't exist."
             }
-        ind = consumers[args["topic"]][cons_id.index(int(args["consumer_id"]))][1]
-        if ind >= len(logs[args["topic"]]):
+
+        # if consumer's topic doesn't match with the topic sent in argument, then return error  
+        if consumer.topic_id != topic.id:
              return {
+                "status": "Failure",
+                "message": f"Consumer with id = {args['consumer_id']} doesn't have access to the topic {topic.name}"
+            }
+
+        num_log_messages = LogsModel.query.filter_by(topic_id = topic.id).count()
+        
+        # If no new messages to read, then return error
+        if consumer.idx_read_upto >= num_log_messages:
+            return {
                 "status": "Failure",
                 "message": "No new updates/messages for the given topic."
             }
-        msg = logs[args["topic"]][ind]
+        
+        log_msg_entry = LogsModel.query.filter_by(topic_id = topic.id, message_index=consumer.idx_read_upto).first()
+        consumer.idx_read_upto += 1
+        db.session.commit()
         return {
             "status": "Success",
-            "message": "Message " + msg + " retrieved for the topic."
+            "message": f"Message `{log_msg_entry.message}` retrieved for the topic."
         }
+        
+        # if args["topic"] not in topics:
+        #     return {
+        #         "status": "Failure",
+        #         "message": "Topic '" + request.get_json()["topic"] + "' doesn't exist."
+        #     }
+        # cons_id = [i[0] for i in consumers[args["topic"]]]
+        # if int(args["consumer_id"]) not in cons_id:
+        #     return {
+        #         "status": "Failure",
+        #         "message": "Consumer ID '" + request.get_json()["consumer_id"] + "' is not registered for the given topic."
+        #     }
+        # ind = consumers[args["topic"]][cons_id.index(int(args["consumer_id"]))][1]
+        # if ind >= len(logs[args["topic"]]):
+        #      return {
+        #         "status": "Failure",
+        #         "message": "No new updates/messages for the given topic."
+        #     }
+        # msg = logs[args["topic"]][ind]
+        # return {
+        #     "status": "Success",
+        #     "message": "Message " + msg + " retrieved for the topic."
+        # }
     
 class Size(Resource):
     parser = reqparse.RequestParser()
@@ -259,29 +349,60 @@ class Size(Resource):
 
     def get(self):
         args = Size.parser.parse_args()
+
+        topic = TopicsModel.query.filter_by(name=args["topic"]).first()
         
-        if args["topic"] not in topics:
+        # If topic doesn't exist then return error.
+        if topic is None:
             return {
                 "status": "Failure",
-                "message": "Topic '" + request.get_json()["topic"] + "' doesn't exist."
+                "message": f"Topic {args['topic']} doesn't exist."
             }
-        cons_id = [i[0] for i in consumers[args["topic"]]]
-        if int(args["consumer_id"]) not in cons_id:
+
+        consumer = ConsumerModel.query.filter_by(consumer_id = args["consumer_id"]).first()
+
+        # If Consumer does not exist then return error
+        if consumer is None:
             return {
                 "status": "Failure",
-                "message": "Consumer ID '" + request.get_json()["consumer_id"] + "' is not registered for the given topic."
+                "message": f"Consumer with id = {args['consumer_id']} doesn't exist."
             }
-        ind = consumers[args["topic"]][cons_id.index(int(args["consumer_id"]))][1]
-        if ind >= len(logs[args["topic"]]):
+
+        # if consumer's topic doesn't match with the topic sent in argument, then return error  
+        if consumer.topic_id != topic.id:
              return {
-                "status": "Success",
-                "message": "No new updates/messages for the given topic."
+                "status": "Failure",
+                "message": f"Consumer with id = {args['consumer_id']} doesn't have access to the topic {topic.name}"
             }
-        size = len(logs[args["topic"]]) - ind
+
+        num_log_messages = LogsModel.query.filter_by(topic_id = topic.id).count() - consumer.idx_read_upto
         return {
             "status": "Success",
-            "message": str(size) + " updates/messages for the given topic."
+            "size": num_log_messages
         }
+
+        # if args["topic"] not in topics:
+        #     return {
+        #         "status": "Failure",
+        #         "message": "Topic '" + request.get_json()["topic"] + "' doesn't exist."
+        #     }
+        # cons_id = [i[0] for i in consumers[args["topic"]]]
+        # if int(args["consumer_id"]) not in cons_id:
+        #     return {
+        #         "status": "Failure",
+        #         "message": "Consumer ID '" + request.get_json()["consumer_id"] + "' is not registered for the given topic."
+        #     }
+        # ind = consumers[args["topic"]][cons_id.index(int(args["consumer_id"]))][1]
+        # if ind >= len(logs[args["topic"]]):
+        #      return {
+        #         "status": "Success",
+        #         "message": "No new updates/messages for the given topic."
+        #     }
+        # size = len(logs[args["topic"]]) - ind
+        # return {
+        #     "status": "Success",
+        #     "message": str(size) + " updates/messages for the given topic."
+        # }
 
 api.add_resource(Topics, '/topics')
 api.add_resource(ConsumerRegister, '/consumer/register')
