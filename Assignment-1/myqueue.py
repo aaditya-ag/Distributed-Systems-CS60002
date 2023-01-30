@@ -1,7 +1,7 @@
 import requests
 
 def get(url, payload):
-    response = requests.get(url, params=payload)
+    response = requests.get(url, json=payload)
 
     if response.status_code == 200:
         data = response.json()
@@ -15,7 +15,7 @@ def get(url, payload):
 def post(url, payload):
     response = requests.post(url, json=payload)
 
-    if response.status_code == 201:
+    if response.status_code == 200:
         data = response.json()
         return data
     else:
@@ -84,7 +84,7 @@ class MyConsumer():
         result = get(url, payload)
         if result['status'] != "Success":
             raise Exception(result['message'])
-        elif result['message'] != "No new updates/messages for the given topic.":
+        elif result['size'] == 0:
             return False
         return True
 
@@ -100,8 +100,9 @@ class MyConsumer():
         result = get(url, payload)
         if result['status'] != "Success":
             raise Exception(result['message'])
+        return result['message']
     
-    def has_next(self, topic):
+    def size(self, topic):
         lst = [self.broker]
         lst.append('size')
         url = '/'.join(lst)
@@ -113,4 +114,4 @@ class MyConsumer():
         result = get(url, payload)
         if result['status'] != "Success":
             raise Exception(result['message'])
-        return result['message']
+        return result['size']
