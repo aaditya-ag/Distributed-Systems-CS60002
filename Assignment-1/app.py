@@ -227,7 +227,7 @@ class Dequeue(Resource):
         msg = m_queue.queues[args["topic"]][ind]
         return {
             "status": "Success",
-            "message": "Message " + msg + " retrieved for the topic."
+            "message": msg
         }
     
 class Size(Resource):
