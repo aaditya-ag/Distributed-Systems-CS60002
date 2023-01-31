@@ -66,3 +66,23 @@ flask db upgrade
 ```
 flask run
 ```
+
+### How to run the tests?
+
+- For producer
+```
+python producer.py <broker_url> <File the producer reads from> 
+```
+Example:
+```
+python producer.py http://127.0.0.1:5000 ../test_asgn1/producer_1.txt 
+```
+
+- For consumer
+```
+python consumer.py <broker_url> <outfile_prefix> <topics_to_register> 
+```
+Example:
+```
+python consumer.py http://127.0.0.1:5000 consumer_1 T-1 T-2 T-3 
+```
