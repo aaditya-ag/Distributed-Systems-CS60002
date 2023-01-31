@@ -67,6 +67,17 @@ flask db upgrade
 flask run
 ```
 
+### How to install the library
+
+- Setup library
+```
+python setup.py bdist_wheel
+```
+
+```
+pip install dist/<name_of_file>
+```
+
 ### How to run the tests?
 
 - For producer
