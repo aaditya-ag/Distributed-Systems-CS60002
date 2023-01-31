@@ -207,7 +207,7 @@ class Dequeue(Resource):
         db.session.commit()
         return {
             "status": "Success",
-            "message": f"Message `{log_msg_entry.log_message}` retrieved for the topic."
+            "message": log_msg_entry.log_message
         }, 200
         
     
