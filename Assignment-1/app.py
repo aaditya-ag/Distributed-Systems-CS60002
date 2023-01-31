@@ -14,7 +14,7 @@ from models import (
     TopicsModel, 
     ProducerModel, 
     ConsumerModel,
-    LogsModel
+    QueueModel
 )
 
 class Topics(Resource):
@@ -147,16 +147,16 @@ class Enqueue(Resource):
             }, 400
 
         # Get the next message index from the database in this queue
-        msg_index = LogsModel.query.filter_by(topic_id = topic.id).count()
+        msg_index = QueueModel.query.filter_by(topic_id = topic.id).count()
         
         # Create the log message
-        log_message = LogsModel(topic_id=topic.id, message=args["message"], message_index=msg_index)
+        log_message = QueueModel(topic_id=topic.id, message=args["message"], message_index=msg_index)
         db.session.add(log_message)
         db.session.commit()
 
         return {
             "status": "Success",
-            "message": f"Message `{log_message.message}` added for the topic."
+            "message": f"Message `{log_message.log_message}` added for the topic."
         }, 200
 
 
@@ -193,7 +193,7 @@ class Dequeue(Resource):
                 "message": f"Consumer with id = {args['consumer_id']} doesn't have access to the topic {topic.name}"
             }, 400
 
-        num_log_messages = LogsModel.query.filter_by(topic_id = topic.id).count()
+        num_log_messages = QueueModel.query.filter_by(topic_id = topic.id).count()
         
         # If no new messages to read, then return error
         if consumer.idx_read_upto >= num_log_messages:
@@ -202,12 +202,12 @@ class Dequeue(Resource):
                 "message": "No new updates/messages for the given topic."
             }, 400
         
-        log_msg_entry = LogsModel.query.filter_by(topic_id = topic.id, message_index=consumer.idx_read_upto).first()
+        log_msg_entry = QueueModel.query.filter_by(topic_id = topic.id, message_index=consumer.idx_read_upto).first()
         consumer.idx_read_upto += 1
         db.session.commit()
         return {
             "status": "Success",
-            "message": f"Message `{log_msg_entry.message}` retrieved for the topic."
+            "message": f"Message `{log_msg_entry.log_message}` retrieved for the topic."
         }, 200
         
     
@@ -244,7 +244,7 @@ class Size(Resource):
                 "message": f"Consumer with id = {args['consumer_id']} doesn't have access to the topic {topic.name}"
             }, 400
 
-        num_log_messages = LogsModel.query.filter_by(topic_id = topic.id).count() - consumer.idx_read_upto
+        num_log_messages = QueueModel.query.filter_by(topic_id = topic.id).count() - consumer.idx_read_upto
         return {
             "status": "Success",
             "size": num_log_messages

@@ -59,7 +59,7 @@ class ConsumerModel(db.Model):
         }
 
 
-class LogsModel(db.Model):
+class QueueModel(db.Model):
 
     # We always need an id for each entry in the db
     id = db.Column(db.Integer, primary_key=True)
@@ -68,7 +68,7 @@ class LogsModel(db.Model):
     topic_id = db.Column(db.Integer, db.ForeignKey(TopicsModel.id))
 
     # We need to store the content of the log message
-    message = db.Column(db.String, nullable=False)
+    log_message = db.Column(db.String, nullable=False)
 
     # We need an index of the message to retrieve it in future from the database
     message_index = db.Column(db.Integer, index=True)
@@ -76,13 +76,13 @@ class LogsModel(db.Model):
 
     def __init__(self, topic_id, message, message_index):
         self.topic_id = topic_id
-        self.message = message
+        self.log_message = message
         self.message_index = message_index
 
     def as_dict(self):
         return  {
             "id": self.id,
             "topic_id": self.topic_id,
-            "message": self.message,
+            "message": self.log_message,
             "message_index":self.message_index
         }
