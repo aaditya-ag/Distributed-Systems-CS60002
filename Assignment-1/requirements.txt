@@ -25,7 +25,6 @@ markdown-it-py==2.1.0
 MarkupSafe==2.1.2
 mdurl==0.1.2
 more-itertools==9.0.0
-myqueue-library @ file:///home/aaditya/Academics/Sem_8/Distributed-Systems-CS60002/Assignment-1/dist/myqueue_library-0.1.0-py3-none-any.whl
 pkginfo==1.9.6
 psycopg2-binary==2.9.5
 pycparser==2.21
