@@ -23,7 +23,7 @@ class Topics(Resource):
 
     def get(self):
         topics = TopicsModel.query.all()
-        topics = [topic.as_dict() for topic in topics]
+        topics = [topic.name for topic in topics]
         return {
             "status": "Success",
             "topics": topics
