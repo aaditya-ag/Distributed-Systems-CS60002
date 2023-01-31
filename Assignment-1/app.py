@@ -136,19 +136,7 @@ class ConsumerRegister(Resource):
             }
         else:
             next_consumer_id = m_consumers.add_consumer(args["topic"])
-            # if(args["topic"] not in m_consumers.get_topics()):
-            #     m_consumers.lock.acquire()
-            #     m_consumers.consumers[args["topic"]] = []
-            #     m_consumers.consumers[args["topic"]].append([next_consumer_id,0])
-            #     m_consumers.lock.release()
-            # else: 
-            #     for _consumer in m_consumers.get_topics():
-            #         next_consumer_id = max(next_consumer_id, _consumer[0])
-            #     next_consumer_id += 1
-            #     m_consumers.lock.acquire()
-            #     m_consumers.consumers[args["topic"]].append([next_consumer_id,0])
-            #     m_consumers.lock.release()
-
+        
             ## DEBUG ##
             print(m_consumers.consumers)
             ###########
@@ -174,23 +162,7 @@ class ProducerRegister(Resource):
             m_queue.add_topic(args["topic"])
 
         next_producer_id = m_producers.add_producer(args["topic"])
-        # next_producer_id = 0
-        # if args["topic"] not in topics:
-        #     # if topic doesnt exist, add the topic
-        #     topics.append(args["topic"])
-        #     # since topic is newly added, create a new topic entry in the producers dict
-        #     producers[args["topic"]] = [next_producer_id]
-        # else:
-        #     # topic exist but no one has registered to it as producer
-        #     if(args["topic"] not in producers.keys()):
-        #         producers[args["topic"]] = [next_producer_id]
-        #     # already existing entries for producers of the topic
-        #     else:
-        #         for _producer in producers[args["topic"]]:
-        #             next_producer_id = max(_producer, next_producer_id)
-        #         next_producer_id += 1
-        #         producers[args["topic"]].append(next_producer_id)
-
+        
         ## DEBUG ##
         print(m_producers.producers)
         ###########
@@ -286,7 +258,7 @@ class Size(Resource):
         size = len(m_queue.queues[args["topic"]]) - ind
         return {
             "status": "Success",
-            "message": str(size) + " updates/messages for the given topic."
+            "size": size
         }
 
 api.add_resource(Topics, '/topics')
