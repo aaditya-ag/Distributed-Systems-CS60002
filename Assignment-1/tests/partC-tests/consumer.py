@@ -7,11 +7,14 @@ topics = sys.argv[3:]
 
 consumer = MyConsumer(topics = topics, broker = broker_url)
 
+for topic in topics:
+    with open(out_file_base + "_" + topic + ".txt", "w") as fout:
+        pass
+
 while(True):
     for topic in topics:
         if(consumer.has_next(topic)):
             message = consumer.get_next(topic)
-            print("read message:", message)
             with open(out_file_base + "_" + topic + ".txt", "a") as fout:
                 fout.write(message)
                 fout.write("\n")

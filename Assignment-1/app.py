@@ -2,6 +2,7 @@ from flask import Flask, jsonify, request
 from flask_restful import Resource, Api, reqparse
 from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate
+import threading
 
 app = Flask(__name__)
 app.config['SQLALCHEMY_DATABASE_URI'] = "postgresql://postgres:admin@localhost:5432/distributed_queue"
@@ -18,6 +19,7 @@ from models import (
 )
 
 class Topics(Resource):
+    lock = threading.Semaphore()
     parser = reqparse.RequestParser()
     parser.add_argument('name', required = True, help = '"Name" field should be provided in the body')
 
@@ -32,7 +34,14 @@ class Topics(Resource):
     def post(self):
         args = Topics.parser.parse_args()
 
+        # Make the operation atomic
+        self.lock.acquire()
+
         if TopicsModel.query.filter_by(name=args["name"]).first() is not None:
+
+            # Release the lock
+            self.lock.release()
+
             return {
                 "status": "Failure",
                 "message": "Topic \'" + request.get_json()["name"] + "\' already exists."
@@ -40,7 +49,12 @@ class Topics(Resource):
         else:
             topic = TopicsModel(name = args["name"])
             db.session.add(topic)
+            db.session.flush()
             db.session.commit()
+
+            # Release the lock
+            self.lock.release()
+
             return {
                 "status": "Success",
                 "message": "Topic \'" + topic.name + "\' created."
@@ -80,6 +94,7 @@ class ConsumerRegister(Resource):
         }, 200
 
 class ProducerRegister(Resource):
+    lock = threading.Semaphore()
     parser = reqparse.RequestParser()
     parser.add_argument('topic', required = True, help = '"topic" field should be provided in the body')
     
@@ -90,6 +105,9 @@ class ProducerRegister(Resource):
         print(args["topic"])
         ###########
 
+        # Make the operation atomic
+        self.lock.acquire()
+
         topic = TopicsModel.query.filter_by(name=args["topic"]).first()
 
         # If topic doesn't exist then create one.
@@ -98,7 +116,12 @@ class ProducerRegister(Resource):
             db.session.add(topic)
             db.session.flush()
             db.session.commit()
+
+        # Release the lock
+        self.lock.release()
         
+        # topic = TopicsModel.query.filter_by(name=args["topic"]).first()
+
         topic_id = topic.id
         producer = ProducerModel(topic_id=topic_id)
         db.session.add(producer)
@@ -113,6 +136,7 @@ class ProducerRegister(Resource):
 
 
 class Enqueue(Resource):
+    lock = threading.Semaphore()
     parser = reqparse.RequestParser()
     parser.add_argument('topic', required = True, help = 'topic name for the message to be added')
     parser.add_argument('producer_id', required = True, help = 'producer ID of the client')
@@ -146,6 +170,9 @@ class Enqueue(Resource):
                 "message": f"Producer with id = {args['producer_id']} doesn't have access to the topic {topic.name}"
             }, 400
 
+        # Make the operation atomic
+        self.lock.acquire()
+        
         # Get the next message index from the database in this queue
         msg_index = QueueModel.query.filter_by(topic_id = topic.id).count()
         
@@ -153,6 +180,9 @@ class Enqueue(Resource):
         log_message = QueueModel(topic_id=topic.id, message=args["message"], message_index=msg_index)
         db.session.add(log_message)
         db.session.commit()
+
+        # Release the lock
+        self.lock.release()
 
         return {
             "status": "Success",
@@ -202,7 +232,9 @@ class Dequeue(Resource):
                 "message": "No new updates/messages for the given topic."
             }, 400
         
+        # print(consumer.idx_read_upto, num_log_messages)
         log_msg_entry = QueueModel.query.filter_by(topic_id = topic.id, message_index=consumer.idx_read_upto).first()
+        assert(log_msg_entry is not None)
         consumer.idx_read_upto += 1
         db.session.commit()
         return {
