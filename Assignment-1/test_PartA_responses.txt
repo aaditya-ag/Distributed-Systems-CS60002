@@ -1,0 +1,33 @@
+{
+    "status": "Success",
+    "topics": []
+}
+{
+    "status": "Success",
+    "message": "Topic 'Kagenou' created."
+}
+{
+    "status": "Failure",
+    "message": "Topic 'Kagenou' already exists."
+}
+{
+    "status": "Success",
+    "message": "Topic 'Minoru' created."
+}
+{
+    "status": "Success",
+    "topics": [
+        "Kagenou",
+        "Minoru"
+    ]
+}
+{
+    "status": "Success",
+    "producer_id": 0,
+    "message": "Subscribed to topic 'Minoru'."
+}
+{
+    "status": "Success",
+    "consumer_id": 0,
+    "message": "Subscribed to topic 'Minoru'."
+}
